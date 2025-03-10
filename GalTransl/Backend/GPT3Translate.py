@@ -28,6 +28,9 @@ from GalTransl.Backend.Prompts import (
     GPT35_1106_TRANS_PROMPT,
     GPT35_0125_SYSTEM_PROMPT,
     GPT35_0125_TRANS_PROMPT,
+    CUSTOM_SYSTEM_PROMPT,
+    CUSTOM_TRANS_PROMPT,
+    CUSTOM_NAME_PROMPT3
 )
 
 
@@ -110,6 +113,8 @@ class CGPT35Translate:
             self.opencc = OpenCC("s2t.json")
 
         self.init_chatbot(eng_type=eng_type, config=config)  # 模型选择
+
+        self.error_message = "" # 存储错误信息，作为对模型的反馈
         pass
 
     def init(self) -> bool:
@@ -120,6 +125,9 @@ class CGPT35Translate:
 
     def init_chatbot(self, eng_type, config):
         eng_name = config.getBackendConfigSection("GPT35").get("rewriteModelName", "")
+
+        # Try with custom model
+        LOGGER.info(f"使用的引擎类型:{eng_type}")
 
         if eng_type == "gpt35-0613":
             from GalTransl.Backend.revChatGPT.V3 import Chatbot as ChatbotV3
@@ -139,6 +147,9 @@ class CGPT35Translate:
             self.chatbot.update_proxy(
                 self.proxyProvider.getProxy().addr if self.proxyProvider else None  # type: ignore
             )
+        
+        # Qwen models uses gpt35-1106 engine type
+        # Change the system prompt for your use case here
         elif eng_type == "gpt35-1106":
             from GalTransl.Backend.revChatGPT.V3 import Chatbot as ChatbotV3
 
@@ -148,13 +159,13 @@ class CGPT35Translate:
             self.chatbot = ChatbotV3(
                 api_key=self.token.token,
                 engine=eng_name,
-                system_prompt=GPT35_1106_SYSTEM_PROMPT,
+                system_prompt=CUSTOM_SYSTEM_PROMPT, #GPT35_1106_SYSTEM_PROMPT
                 api_address=self.token.domain + "/v1/chat/completions",
                 timeout=30,
                 response_format="json",
             )
-            self.trans_prompt = GPT35_1106_TRANS_PROMPT
-            self.name_prompt = GPT35_1106_NAME_PROMPT3
+            self.trans_prompt = CUSTOM_TRANS_PROMPT #GPT35_1106_TRANS_PROMPT
+            self.name_prompt = CUSTOM_NAME_PROMPT3 #GPT35_1106_NAME_PROMPT3
             self.chatbot.update_proxy(
                 self.proxyProvider.getProxy().addr if self.proxyProvider else None  # type: ignore
             )
@@ -204,6 +215,7 @@ class CGPT35Translate:
             prompt_req = prompt_req.replace("[NamePrompt3]", "")
         while True:  # 一直循环，直到得到数据
             try:
+                prompt_req = prompt_req.replace("[Errors]", self.error_message)
                 # change token
                 if self.eng_type != "unoffapi":
                     self.token = self.tokenProvider.getToken(True, False)
@@ -232,6 +244,9 @@ class CGPT35Translate:
                     LOGGER.info(f"-> 输出：\n{resp}")
                 else:
                     print("")
+
+                # 重置报错信息
+                self.error_message = ""
             except Exception as ex:
                 str_ex = str(ex).lower()
                 LOGGER.error(f"-> {str_ex}")
@@ -278,10 +293,12 @@ class CGPT35Translate:
                 if len(result_json) != len(input_list):  # 输出行数错误
                     LOGGER.error("-> 错误的输出行数：\n" + result_json + "\n")
                     error_message = "输出行数错误"
+                    self.error_message = error_message
                     error_flag = True
             except:
                 LOGGER.error("-> 非json：\n" + result_text + "\n")
                 error_message = "输出非json"
+                self.error_message = error_message
                 error_flag = True
 
             if not error_flag:
@@ -290,11 +307,13 @@ class CGPT35Translate:
                     # 本行输出不正常
                     if key_name not in result or type(result[key_name]) != str:
                         error_message = f"第{content[i].index}句找不到{key_name}"
+                        self.error_message = error_message
                         error_flag = True
                         break
                     # 本行输出不应为空
                     if content[i].post_jp != "" and result[key_name] == "":
                         error_message = f"第{content[i].index}句空白"
+                        self.error_message = error_message
                         error_flag = True
                         break
                     # 本行输出有多余的 /
@@ -302,6 +321,7 @@ class CGPT35Translate:
                         char in content[i].post_jp for char in ["／", "/", "・"]
                     ):
                         error_message = f"第{content[i].index}句多余 / 符号"
+                        self.error_message = error_message
                         error_flag = True
                         break
                     # 丢name

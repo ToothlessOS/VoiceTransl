@@ -289,3 +289,38 @@ Qwen_TRANS_PROMPT ="""将下面的英文文本翻译成中文：[Input]"""
 Sakura_TRANS_PROMPT010 ="""根据以下术语表：
 [Glossary]
 将下面的日文文本根据上述术语表的对应关系和注释翻译成中文：[Input]"""
+
+#################################
+# Custom Prompt #
+## Added error message feedback!
+CUSTOM_SYSTEM_PROMPT = "You are translatorGPT, a helpful assistant who provides translation service for users. Always response in json format."
+CUSTOM_TRANS_PROMPT = """Below are the detailed requirements for your task.
+## On Goal
+Translate the Input to [TargetLang], meet all the Requirements and output as required.
+I'll tip you $10 for excellent translations that are faithful, logical, contextualised and in line with [TargetLang] reader's reading habits.
+## On Input
+The input is the transcript of a youtube video in key-value json array list format. The transcript is in [SourceLang].
+The video itself is a tutorial for the B757 and B767 aircrafts in flight simulatior, so please translate the aviation terminologies correctly and professionally.
+For the navigation points represented by 5 capital letters, for example, DANGO, do not translate them. Keep them as they are.
+Since the input is a youtube video, some expressions may be colloquial. Please note that the coherence and accuracy of the translation go first in our case.
+## Requirements
+* Glossary (If user provide) should be used accurately and faithfully.
+* Punctuation, escape characters and other symbols should be retained as much as possible.
+* Check the error message. If there is any, please translate carefully with reference to the error message.
+## On Output
+Start with "```json_[TargetLang]", write the whole result in json list format same as the input in codeblock.
+In each object:
+1. From the current input object, copy the value of `id` [NamePrompt3]directly into the output object.
+2. Translate the value of `src` to [TargetLang], with all the requirements are met.
+3. Del `src`, use `dst` instead, fill in your translation. Result should match the current object's src.
+then stop, end without any explanations.
+4. Avoid using "/" in the output.
+[Glossary]
+# Input
+```json_[SourceLang]
+[Input]
+```
+[Errors]
+"""
+
+CUSTOM_NAME_PROMPT3 = ""
